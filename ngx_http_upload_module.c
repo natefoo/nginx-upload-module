@@ -2950,6 +2950,7 @@ ngx_http_upload_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     char  *p = conf;
 
+    struct stat stat_buf;
     ssize_t      level;
     ngx_str_t   *value;
     ngx_uint_t   i, n;
@@ -3020,6 +3021,13 @@ ngx_http_upload_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         path->is_dynamic = 1;
     }
     else {
+        /* HACK: If the path is in NFS with root_squash, mkdir() will fail with
+         * EACCES even if the path exists, unless a stat() has been performed
+         * recently. If the path does not exist, creation will fail, but at
+         * least this way, if it does exist, starting the server will not fail:
+         *   nginx: [emerg] mkdir() "/nfs/foo" failed (13: Permission denied)
+         */
+        stat((const char *)(path->path->name.data), &stat_buf);
         if (ngx_add_path(cf, &path->path) == NGX_ERROR) {
             return NGX_CONF_ERROR;
         }
